@@ -1,0 +1,198 @@
+% Code up of North and Coakley's seasonal EBM model
+% Simplified to eliminate the ocean domain
+% Designed to run without a seasonal cycle and hence
+% to stop once an equilibrium solution is reached.
+% The model uses an implicit trapezoidal method
+% so the timestep can be long.
+
+%size of domain.
+jmx=151;
+
+% Choose parameters.
+% scaleQ
+if (exist('scaleQ')==0); scaleQ=1.; end
+
+%heat diffusion coefficient.
+if (exist('Dmag')==0); Dmag = 0.44; end
+
+%heat diffusion coefficient.
+if (exist('coldstartflag')==1); 
+  if (coldstartflag==1), Toffset = -40; end
+end
+  
+%Simulate Hadley Cell with Lindzen and Farrell plan
+if (exist('hadleyflag')==0); hadleyflag = 0.; end
+
+%Remove albedo feedback
+if (exist('albedoflag')==0); albedoflag = 0.; end
+
+scaleQ = 0.94; %hoffman and schrag 2000
+Toffset = -40; %cold start
+
+%heat capacity over land.
+Cl = 0.2; % something small to make it equilibriate quickly
+
+%constants
+K = 2.1; % thermal conductivity of ice [W(mK)^-1] for 0 degrees C
+G = 40*10^-3; % Geothermal heat flux [W(m^-2)]
+Tglacier = -10; % average T at which a ice sheet forms (from North model) [Celcius]
+Tbase =  0; %temperature at base of ice sheet [Celcius]
+
+%CO2
+initial_co2 = 170; %ppmv
+outgassing = 10^10; %[kgCO2/year] <--- !find realistic value
+timestep = 10^5; %years
+dppmv=outgassing_to_ppmv(outgassing)*timestep; %increase in co2 ppmv per timestep
+total_time = 10^8; %years
+t = 0:timestep:total_time;
+meanT = t;%create array for the mean temperature over time
+iceline = t;%create array for the iceline over time [degrees latitude]
+
+
+%set up inital T profile 
+T = 20*(1-2*x.^2);
+T=T(:);
+T=T+Toffset;
+%load T_final
+Tinit=T;
+
+for kyr=1:length(t) % kyear increments
+    % as in Caldeira et al. Box 1
+    co2 = initial_co2 + (kyr-1)*dppmv;
+    phi_co2 = log(co2 / 300);
+    
+    B =  1.953 - 0.04866 * phi_co2 + 0.01309 * phi_co2 .^ 2 - 0.002577 * phi_co2 .^3;
+    A = -326.4 + 9.161 * phi_co2 - 3.164 * phi_co2.^2 + 0.5468 * phi_co2.^3; 
+    A = A + B * 273.15; % correction Kelvin to Celsius
+    
+    %time step in fraction of year
+    delt=1./50;
+    NMAX=1000; 
+
+    %set up x array.
+    delx = 2.0/jmx;
+    x = [-1.0+delx/2:delx:1.0-delx/2]';
+    phi = asin(x)*180/pi;
+
+    %obtain annual array of daily averaged-insolation.
+    %[insol] = sun(x);
+    %Legendre polynomial realizatin of mean annual insol.
+    Q = 338.5;
+    S = Q*(1-0.241*(3*x.^2-1)); 
+    S=scaleQ*S; S=S(:);
+    
+
+    %setup D(x) if simulating the Hadley Cell
+    %and calculate the matrix Mh and invM.
+    if (hadleyflag)
+      xmp=[-1:delx:1];
+      D=Dmag*(1+9*exp(-(xmp/sin(25*pi/180)).^6));
+      D=D(:);
+      [invM,Mh]=setupfastM(delx,jmx,D,B,Cl,delt);
+    else
+      D=Dmag*ones(jmx+1,1);
+      [invM,Mh]=setupfastM(delx,jmx,D,B,Cl,delt);
+    end
+
+    %Boundary conditions
+    %Set up initial value for h.
+     alb=albedo(T,jmx,x,albedoflag,Tglacier);
+     src   = (1-alb).*S/Cl-A/Cl; src=src(:);
+     h=Mh*T+src;
+
+    %Global mean temperature
+    Tglob=mean(T);
+
+    time = 0;
+    meanTdev = 0;
+    % Timestepping loop
+    for n=1:NMAX
+       Tglob_prev = Tglob;
+
+    % Calculate src for this loop.
+       alb=albedo(T,jmx,x,albedoflag, Tglacier);
+       src=((1-alb).*S-A)/Cl; src=src(:);
+
+    % Calculate new T.
+       T=-invM*(0.5*(h+src)+T/delt);
+
+    % Calculate h for next loop.
+       h=Mh*T+src;
+
+    % Check to see if global mean temperature has converged
+       Tglob=mean(T);
+       time(n)=n;
+       meanTdev(n)=Tglob;
+       Tchange = Tglob-Tglob_prev;
+       if (abs(Tchange) < 1.0e-12), break; end
+    end
+
+    %save T_final.mat T
+
+    % compute meridional heat flux and its convergence
+    a=6.37e+6; % earth radius in meters
+    [invM,Mh]=setupfastM(delx,jmx,D,0.,1.0,delt);
+    Dmp=0.5*( D(2:jmx+1)+D(1:jmx) );
+    divF=Mh*T;
+    F=-2*pi*a^2*sqrt(1-x.^2).*Dmp.*gradient(T,delx);
+
+    %calculate ice thickness assuming no advection
+    T2 = T;
+    T2(T2>Tglacier) = 0; %no glacier forms where T is higher than Tglacier
+    ice_thickness = -K*(T2-Tbase)/G;
+    iceline(kyr) = 90-asin(length(ice_thickness(ice_thickness>0))/jmx)*180/pi; %determine the ice line, and convert to latitude
+    
+    meanT(kyr)=Tglob;
+
+end
+
+figure;
+set(gcf, 'WindowState', 'maximized');
+subplot(3,1,1);
+plot(t,meanT);
+title('Mean T (C)');
+subplot(3,1,2);
+plot(t,initial_co2+dppmv*(t/timestep));
+title('CO2-concentration (ppmV)');
+subplot(3,1,3);
+plot(t,iceline);
+title('iceline');
+
+%     figure; 
+%     set(gcf, 'WindowState', 'maximized');
+%     subplot(4,1,1);
+%     plot(phi,T,'.-','linewidth',1.5)
+%     ylabel('Temperature'); xlabel('latitude');
+%     %set(gca,'position',[0.1300    0.71    0.7750    0.21]);
+%     title(['Global mean temperature is ',num2str(Tglob,'%7.2f'), ', CO2 is ',num2str(co2)]);
+%     grid on;
+% 
+%     %subplot(4,1,2);
+%     %plot(phi,F*1e-15,'.-','linewidth',1.5)
+%     %ylabel('Poleward Heat Flux (10^{15} W)'); xlabel('latitude');
+%     %set(gca,'position',[0.1300    0.41    0.7750    0.21]);
+%     %grid on;
+% 
+%     subplot(4,1,2);
+%     plot(phi,ice_thickness,'.-','linewidth',1.5)
+%     ylabel('Ice thickness (m)'); xlabel('latitude');
+%     grid on;
+% 
+%     subplot(4,1,3);
+%     plot(phi,divF,'.-',phi,(1-alb).*S,'o',phi,A+B*T,'.','linewidth',1.5)
+%     ylabel('Energy Balance Terms (W m^{-2})'); xlabel('latitude');
+%     %set(gca,'position',[0.1300    0.130    0.7750    0.21]);
+%     legend('\nabla F','SWd','LWu');
+%     grid on;
+%     u=axis; pos=u(3)-0.4*(u(4)-u(3));
+%     text(-90,pos,['D = ',num2str(Dmag,'%7.2f'),...
+%            ',    Q/Qo = ',num2str(scaleQ,'%7.3f'),...
+%            ',    A = ',num2str(A,'%7.1f'),...
+%            ',    B = ',num2str(B,'%7.1f'),...
+%            ',    Toffset = ',num2str(Toffset,'%7.1f')] );
+% 
+%     subplot(4,1,4);
+%     plot(time, meanTdev)
+%     ylabel('Mean T'); xlabel('time');
+%     %set(gca,'position',[0.1300    0.130    0.7750    0.21]);
+%     grid on;

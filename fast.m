@@ -47,7 +47,12 @@ total_time = 2*10^8; %years
 t = 0:timestep:total_time;
 meanT = t;%create array for the mean temperature over time
 iceline = t;%create array for the iceline over time [degrees latitude]
+co2_dev = t;%create array for the CO2 concentration development over time [ppmV]
 
+%set up x array.
+delx = 2.0/jmx;
+x = [-1.0+delx/2:delx:1.0-delx/2]';
+phi = asin(x)*180/pi;
 
 %set up inital T profile 
 T = 20*(1-2*x.^2);
@@ -58,7 +63,8 @@ Tinit=T;
 
 for kyr=1:length(t) % kyear increments
     % as in Caldeira et al. Box 1
-    co2 = initial_co2 + (kyr-1)*dppmv;
+    co2 = (initial_co2 + (kyr-1)*dppmv)*10^6/(10^6+(kyr-1)*dppmv); %calculate co2 concentration in ppmv, adjusted for it's own increase as well
+    co2_dev(kyr) = co2;
     phi_co2 = log(co2 / 300);
     
     B =  1.953 - 0.04866 * phi_co2 + 0.01309 * phi_co2 .^ 2 - 0.002577 * phi_co2 .^3;
@@ -68,11 +74,6 @@ for kyr=1:length(t) % kyear increments
     %time step in fraction of year
     delt=1./50;
     NMAX=1000; 
-
-    %set up x array.
-    delx = 2.0/jmx;
-    x = [-1.0+delx/2:delx:1.0-delx/2]';
-    phi = asin(x)*180/pi;
 
     %obtain annual array of daily averaged-insolation.
     %[insol] = sun(x);
@@ -152,7 +153,7 @@ subplot(3,1,1);
 plot(t,meanT);
 title('Mean T (C)');
 subplot(3,1,2);
-plot(t,initial_co2+dppmv*(t/timestep));
+plot(t,co2_dev);
 title('CO2-concentration (ppmV)');
 subplot(3,1,3);
 plot(t,iceline);

@@ -61,10 +61,10 @@ T=T+Toffset;
 %load T_final
 Tinit=T;
 
-for kyr=1:length(t) % kyear increments
+for j=1:length(t) % timestep increments
     % as in Caldeira et al. Box 1
-    co2 = (initial_co2 + (kyr-1)*dppmv)*10^6/(10^6+(kyr-1)*dppmv); %calculate co2 concentration in ppmv, adjusted for it's own increase as well
-    co2_dev(kyr) = co2;
+    co2 = (initial_co2 + (j-1)*dppmv)*timestep/(timestep+(j-1)*dppmv); %calculate co2 concentration in ppmv, adjusted for it's own increase as well
+    co2_dev(j) = co2;
     phi_co2 = log(co2 / 300);
     
     B =  1.953 - 0.04866 * phi_co2 + 0.01309 * phi_co2 .^ 2 - 0.002577 * phi_co2 .^3;
@@ -97,7 +97,7 @@ for kyr=1:length(t) % kyear increments
 
     %Boundary conditions
     %Set up initial value for h.
-     alb=albedo(T,jmx,x,albedoflag,Tglacier);
+     alb=albedo(T,jmx,x,albedoflag,Tglacier,j, timestep);
      src   = (1-alb).*S/Cl-A/Cl; src=src(:);
      h=Mh*T+src;
 
@@ -111,7 +111,7 @@ for kyr=1:length(t) % kyear increments
        Tglob_prev = Tglob;
 
     % Calculate src for this loop.
-       alb=albedo(T,jmx,x,albedoflag, Tglacier);
+       alb=albedo(T,jmx,x,albedoflag, Tglacier,j, timestep);
        src=((1-alb).*S-A)/Cl; src=src(:);
 
     % Calculate new T.
@@ -141,22 +141,24 @@ for kyr=1:length(t) % kyear increments
     T2 = T;
     T2(T2>Tglacier) = 0; %no glacier forms where T is higher than Tglacier
     ice_thickness = -K*(T2-Tbase)/G;
-    iceline(kyr) = 90-asin(length(ice_thickness(ice_thickness>0))/jmx)*180/pi; %determine the ice line, and convert to latitude
+    iceline(j) = 90-asin(length(ice_thickness(ice_thickness>0))/jmx)*180/pi; %determine the ice line, and convert to latitude
     
-    meanT(kyr)=Tglob;
-
+    meanT(j)=Tglob;
 end
 
 figure;
 set(gcf, 'WindowState', 'maximized');
 subplot(3,1,1);
 plot(t,meanT);
+xlabel('time (yr)')
 title('Mean T (C)');
 subplot(3,1,2);
 plot(t,co2_dev);
+xlabel('time (yr)')
 title('CO2-concentration (ppmV)');
 subplot(3,1,3);
 plot(t,iceline);
+xlabel('time (yr)')
 title('iceline');
 
 %     figure; 

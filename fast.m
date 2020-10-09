@@ -48,6 +48,7 @@ t = 0:timestep:total_time;
 meanT = t;%create array for the mean temperature over time
 iceline = t;%create array for the iceline over time [degrees latitude]
 co2_dev = t;%create array for the CO2 concentration development over time [ppmV]
+albedoMean = t; %create mean albedo array over time
 
 %set up x array.
 delx = 2.0/jmx;
@@ -112,6 +113,7 @@ for j=1:length(t) % timestep increments
 
     % Calculate src for this loop.
        alb=albedo(T,jmx,x,albedoflag, Tglacier,j, timestep);
+       albedoMean(j) = mean(alb);
        src=((1-alb).*S-A)/Cl; src=src(:);
 
     % Calculate new T.
@@ -148,18 +150,22 @@ end
 
 figure;
 set(gcf, 'WindowState', 'maximized');
-subplot(3,1,1);
+subplot(4,1,1);
 plot(t,meanT);
 xlabel('time (yr)')
 title('Mean T (C)');
-subplot(3,1,2);
+subplot(4,1,2);
 plot(t,co2_dev);
 xlabel('time (yr)')
 title('CO2-concentration (ppmV)');
-subplot(3,1,3);
+subplot(4,1,3);
 plot(t,iceline);
 xlabel('time (yr)')
 title('iceline');
+subplot(4,1,4);
+plot(t,albedoMean);
+xlabel('time (yr)')
+title('albedo');
 
 %     figure; 
 %     set(gcf, 'WindowState', 'maximized');

@@ -9,9 +9,6 @@
 jmx=151;
 
 % Choose parameters.
-% scaleQ
-if (exist('scaleQ')==0); scaleQ=1.; end
-
 %heat diffusion coefficient.
 if (exist('Dmag')==0); Dmag = 0.44; end
 
@@ -25,6 +22,11 @@ if (exist('hadleyflag')==0); hadleyflag = 0.; end
 
 %Remove albedo feedback
 if (exist('albedoflag')==0); albedoflag = 0.; end
+
+%Dust albedo / coarse albedo
+dust_albedo = 0;
+%Scale factor outgassing
+scaleCO2 = 1.3;
 
 scaleQ = 0.94; %hoffman and schrag 2000
 Toffset = -40; %cold start
@@ -40,7 +42,7 @@ Tbase =  0; %temperature at base of ice sheet [Celcius]
 
 %CO2
 initial_co2 = 170; %ppmv
-outgassing = 3.1*10^10; %[kgCO2/year] <--- Williams et al. 1992
+outgassing = scaleCO2 * 3.1*10^10; %[kgCO2/year] <--- Williams et al. 1992
 timestep = 10^6; %years
 dppmv=outgassing_to_ppmv(outgassing)*timestep; %increase in co2 ppmv per timestep
 total_time = 2*10^8; %years
@@ -98,7 +100,7 @@ for j=1:length(t) % timestep increments
 
     %Boundary conditions
     %Set up initial value for h.
-     alb=albedo(T,jmx,x,albedoflag,Tglacier,j, timestep);
+     alb=albedo(T,jmx,x,albedoflag,dust_albedo,Tglacier,j, timestep);
      src   = (1-alb).*S/Cl-A/Cl; src=src(:);
      h=Mh*T+src;
 
@@ -112,7 +114,7 @@ for j=1:length(t) % timestep increments
        Tglob_prev = Tglob;
 
     % Calculate src for this loop.
-       alb=albedo(T,jmx,x,albedoflag, Tglacier,j, timestep);
+       alb=albedo(T,jmx,x,albedoflag,dust_albedo,Tglacier,j, timestep);
        albedoMean(j) = mean(alb);
        src=((1-alb).*S-A)/Cl; src=src(:);
 
@@ -153,14 +155,17 @@ set(gcf, 'WindowState', 'maximized');
 subplot(4,1,1);
 plot(t,meanT);
 xlabel('time (yr)')
-title('Mean T (C)');
+ylabel([char(176) 'C'])
+title('Mean T');
 subplot(4,1,2);
 plot(t,co2_dev);
 xlabel('time (yr)')
-title('CO2-concentration (ppmV)');
+ylabel('ppmV')
+title('CO2-concentration');
 subplot(4,1,3);
 plot(t,iceline);
 xlabel('time (yr)')
+ylabel('latitude')
 title('iceline');
 subplot(4,1,4);
 plot(t,albedoMean);

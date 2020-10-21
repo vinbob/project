@@ -24,7 +24,7 @@ if (exist('hadleyflag')==0); hadleyflag = 0.; end
 if (exist('albedoflag')==0); albedoflag = 0.; end
 
 %Dust albedo / coarse albedo
-dust_albedo = 0;
+dust_albedo = 1;
 %Scale factor outgassing
 scaleCO2 = 1.3;
 
@@ -150,6 +150,10 @@ for j=1:length(t) % timestep increments
     meanT(j)=Tglob;
 end
 
+collapsetime = (length(meanT(meanT<0))-1)*timestep; %Snowball earth exists until the meanT suddenly jumps above 0
+co2_collapsetime = co2_dev(collapsetime/timestep); %obtain the co2 concentration upon collapse
+albedo_collapsetime = albedoMean(collapsetime/timestep); %obtain the mean albedo upon collapse
+
 figure;
 set(gcf, 'WindowState', 'maximized');
 subplot(4,1,1);
@@ -171,6 +175,10 @@ subplot(4,1,4);
 plot(t,albedoMean);
 xlabel('time (yr)')
 title('albedo');
+u=axis; pos=u(3)-0.4*(u(4)-u(3));
+text(-90,pos,['At the point of deglaciation: time = ',num2str(collapsetime/10^6,'%7.0f'),...
+            ' Gy,    CO2-level = ',num2str(co2_collapsetime,'%7.0f'),...
+            ' ppmv,    Average albedo = ',num2str(albedo_collapsetime,'%7.4f')] );
 
 %     figure; 
 %     set(gcf, 'WindowState', 'maximized');

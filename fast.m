@@ -48,6 +48,7 @@ dppmv=outgassing_to_ppmv(outgassing)*timestep; %increase in co2 ppmv per timeste
 total_time = 2*10^8; %years
 t = 0:timestep:total_time;
 meanT = t;%create array for the mean temperature over time
+equatorH = t;%create array for the equatorial ice thickness over time
 iceline = t;%create array for the iceline over time [degrees latitude]
 co2_dev = t;%create array for the CO2 concentration development over time [ppmV]
 albedoMean = t; %create mean albedo array over time
@@ -146,8 +147,10 @@ for j=1:length(t) % timestep increments
     T2(T2>Tglacier) = 0; %no glacier forms where T is higher than Tglacier
     ice_thickness = -K*(T2-Tbase)/G;
     iceline(j) = 90-asin(length(ice_thickness(ice_thickness>0))/jmx)*180/pi; %determine the ice line, and convert to latitude
+    equatorH(j) = ice_thickness((jmx+1)/2); %get equator ice thickness
     
     meanT(j)=Tglob;
+    
 end
 
 collapsetime = (length(meanT(meanT<0))-1)*timestep; %Snowball earth exists until the meanT suddenly jumps above 0
@@ -167,14 +170,14 @@ xlabel('time (yr)')
 ylabel('ppmV')
 title('CO2-concentration');
 subplot(4,1,3);
-plot(t,iceline);
-xlabel('time (yr)')
-ylabel('latitude')
-title('iceline');
-subplot(4,1,4);
 plot(t,albedoMean);
 xlabel('time (yr)')
 title('albedo');
+subplot(4,1,4);
+plot(t,equatorH);
+xlabel('time (yr)')
+ylabel('H (m)')
+title('Equatorial ice thickness');
 u=axis; pos=u(3)-0.4*(u(4)-u(3));
 text(-90,pos,['At the point of deglaciation: time = ',num2str(collapsetime/10^6,'%7.0f'),...
             ' Gy,    CO2-level = ',num2str(co2_collapsetime,'%7.0f'),...
